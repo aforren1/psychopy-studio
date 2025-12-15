@@ -1,0 +1,24 @@
+python/config.js
+Centralized configuration management for the Python system. Defines all timeout values, network addresses, file paths, and package names as constants instead of having them scattered throughout the code as magic numbers. This follows the configuration management principle and makes it easy to adjust settings in one place.
+
+python/ConstantsManager.js
+Handles retrieval of constants from the Python liaison module. Spawns a Python subprocess to get liaison constants (like START_MARKER), parses the JSON response, and provides caching. Encapsulates the process of communicating with Python to get configuration data needed for liaison startup.
+
+python/PythonProcessManager.js
+Manages the lifecycle of the Python process. Handles spawning the Python liaison WebSocket server, setting up event listeners for stdout/stderr/exit, and provides clean start/stop functionality. Separates process management concerns from other functionality.
+
+python/WebSocketLiaison.js
+Manages WebSocket communication with the Python liaison server. Handles WebSocket connection/disconnection, sends messages with unique IDs, manages response routing, implements timeouts, and provides heartbeat functionality. Encapsulates all WebSocket-specific logic and message handling.
+
+python/LiaisonServices.js
+Sets up optional PsychoPy services (alerts and preferences). Configures the liaison with PsychoPy-specific handlers for alerts and user preferences. These services are optional and can fail gracefully if PsychoPy isn't fully installed, without breaking the core liaison functionality.
+
+python/ScriptRunner.js
+Manages execution of Python scripts. Spawns Python processes to run scripts, tracks active script processes, handles stdout/stderr output routing, and provides cleanup functionality. Separates script execution from the main liaison communication.
+
+python/PythonShell.js
+Provides interactive Python shell functionality. Creates persistent Python shell sessions for interactive commands, manages input/output parsing with special tokens, and handles the complex communication protocol needed for shell interactions. Extracted from the original monolithic code.
+
+python/python.js (Main Export)
+Orchestrates all components and provides the public API. Coordinates startup/shutdown of all Python components, maintains the exact same public interface as the original code for backward compatibility, implements auto-wait functionality for liaison calls, and manages the overall Python system lifecycle.
+Each file follows single responsibility principle, has clear error boundaries, and can be tested independently while working together to provide the same functionality as the original monolithic python.js file.

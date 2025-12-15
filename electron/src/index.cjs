@@ -11,7 +11,7 @@ if (!fs.existsSync(path.join(app.getPath("appData"), "psychopy4"))) {
   )
 }
 
-const { python, startPython } = require("./python.js");
+const { python } = require("./pythonJS/python.js");
 const { uv } = require("./uv.js");
 const logging = require("./logging.js");
 const { appVersion, isDev } = require('./version.js');
@@ -255,14 +255,14 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
-app.on("quit", (evt, code) => {
+app.on("quit", async (evt, code) => {
   // close svelte
   svelte.process.kill(0);
-  // close python
-  python.process.kill(0);
-  if (process.platform !== 'win32') {
-    // on Linux and Mac, killing the Python process doesn't kill PTB, it has to be killed by PID
-    require("process").kill(python.process.pid)
+  // close python gracefully
+  try {
+    await python.stop();
+  } catch (error) {
+    console.error("Error stopping Python during quit:", error);
   }
 })
 
@@ -359,35 +359,115 @@ const handlers = {
   },
   python: {
     details: ipcMain.handle("python.details", (evt) => python.details),
-    start: ipcMain.handle("python.start", (evt) => python.start()),
-    stop: ipcMain.handle("python.stop", (evt) => python.stop()),
+    start: ipcMain.handle("python.start", async (evt) => {
+      try {
+        return await python.start();
+      } catch (error) {
+        console.error("Failed to start Python:", error);
+        throw error;
+      }
+    }),
+    stop: ipcMain.handle("python.stop", async (evt) => {
+      try {
+        return await python.stop();
+      } catch (error) {
+        console.error("Failed to stop Python:", error);
+        throw error;
+      }
+    }),
     started: ipcMain.handle("python.started", (evt) => python.started),
     uv: {
       dir: ipcMain.handle("python.uv.dir", (evt) => python.uv.dir),
       executable: ipcMain.handle("python.uv.executable", (evt) => python.uv.executable),
       exists: ipcMain.handle("python.uv.exists", (evt) => python.uv.exists()),
-      installUV: ipcMain.handle("python.uv.installUV", (evt) => python.uv.installUV()),
-      installPython: ipcMain.handle("python.uv.installPython", (evt, version, folder) => python.uv.installPython(version, folder)),
+      installUV: ipcMain.handle("python.uv.installUV", async (evt) => {
+        try {
+          return await python.uv.installUV();
+        } catch (error) {
+          console.error("Failed to install UV:", error);
+          throw error;
+        }
+      }),
+      installPython: ipcMain.handle("python.uv.installPython", async (evt, version, folder) => {
+        try {
+          const executable = await python.uv.installPython(version, folder);
+          // Update python details with new executable
+          python.details.executable = executable;
+          return executable;
+        } catch (error) {
+          console.error("Failed to install Python:", error);
+          throw error;
+        }
+      }),
       findPython: ipcMain.handle("python.uv.findPython", (evt, version, folder) => python.uv.findPython(version, folder)),
       getEnvironments: ipcMain.handle("python.uv.getEnvironments", (evt, folder) => python.uv.getEnvironments(folder)),
-      installPackage: ipcMain.handle("python.uv.installPackage", (evt, name, executable) => python.uv.installPackage(name, executable)),
-      uninstallPackage: ipcMain.handle("python.uv.uninstallPackage", (evt, name, executable) => python.uv.uninstallPackage(name, executable)),
+      installPackage: ipcMain.handle("python.uv.installPackage", async (evt, name, executable) => {
+        try {
+          return await python.uv.installPackage(name, executable);
+        } catch (error) {
+          console.error("Failed to install package:", error);
+          throw error;
+        }
+      }),
+      uninstallPackage: ipcMain.handle("python.uv.uninstallPackage", async (evt, name, executable) => {
+        try {
+          return await python.uv.uninstallPackage(name, executable);
+        } catch (error) {
+          console.error("Failed to uninstall package:", error);
+          throw error;
+        }
+      }),
       getPackages: ipcMain.handle("python.uv.getPackages", (evt, executable) => python.uv.getPackages(executable)),
-      getPackageDetails: ipcMain.handle("python.uv.getPackageDetails", (evt, name, executable) => python.uv.getPackageDetails(name, executable)),
+      getPackageDetails: ipcMain.handle("python.uv.getPackageDetails", async (evt, name, executable) => {
+        try {
+          return await python.uv.getPackageDetails(name, executable);
+        } catch (error) {
+          console.error("Failed to get package details:", error);
+          throw error;
+        }
+      }),
     },
     shell: {
       list: ipcMain.handle("python.shell.list", () => Object.keys(python.shell.shells)),
-      send: ipcMain.handle("python.shell.send", (evt, id, msg) => python.shell.send(id, msg)),
+      send: ipcMain.handle("python.shell.send", async (evt, id, msg) => {
+        try {
+          return await python.shell.send(id, msg);
+        } catch (error) {
+          console.error("Failed to send shell message:", error);
+          throw error;
+        }
+      }),
       open: ipcMain.handle("python.shell.open", (evt) => python.shell.open()),
       close: ipcMain.handle("python.shell.close", (evt, id) => python.shell.close(id))
     },
     liaison: {
       constants: ipcMain.handle("python.liaison.constants", (evt) => python.liaison.constants),
-      send: ipcMain.handle("python.liaison.send", (evt, message, timeout = 1000) => python.liaison.send(message, timeout)),
-      ready: ipcMain.handle("python.liaison.ready", async (evt) => await python.liaison.ready.promise)
+      send: ipcMain.handle("python.liaison.send", async (evt, message, timeout = 1000) => {
+        try {
+          return await python.liaison.send(message, timeout);
+        } catch (error) {
+          console.error("Failed to send liaison message:", error);
+          throw error;
+        }
+      }),
+      ready: ipcMain.handle("python.liaison.ready", async (evt) => {
+        try {
+          return await python.liaison.ready.promise;
+        } catch (error) {
+          console.error("Liaison not ready:", error);
+          throw error;
+        }
+      })
     },
     scripts: {
-      run: ipcMain.handle("python.scripts.run", (evt, file, ...args) => python.scripts.run(file, ...args)),
+      run: ipcMain.handle("python.scripts.run", async (evt, file, ...args) => {
+        try {
+          return await python.scripts.run(file, ...args);
+        } catch (error) {
+          console.error("Failed to run script:", error);
+          throw error;
+        }
+      }),
       stop: ipcMain.handle("python.scripts.stop", (evt) => python.scripts.stop())
     }
   }

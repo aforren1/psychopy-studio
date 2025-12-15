@@ -1,13 +1,12 @@
-import { app, BrowserWindow }  from 'electron';
+import { app, BrowserWindow } from 'electron';
 import proc from "child_process";
-import { platform , arch } from "process";
+import { platform, arch } from "process";
 import logging from "./logging.js";
 import path from "path";
 import fs from "fs";
 import unzip from "extract-zip";
 import { extract as untar } from "tar";
 import { appVersion, isDev } from "./version.js";
-import { python } from "./python.js"
 
 let decoder = new TextDecoder();
 
@@ -98,14 +97,14 @@ export async function installUV() {
                 })
             }
             // delete zip file
-            fs.unlink(zipfile, err => {if (err) throw err})
+            fs.unlink(zipfile, err => { if (err) throw err })
         }
     )
 }
 
 export function findPython(
-    version={python: "3.10", psychopy: appVersion.major}, 
-    folder=path.join(app.getPath("appData"), "psychopy4", ".python")
+    version = { python: "3.10", psychopy: appVersion.major },
+    folder = path.join(app.getPath("appData"), "psychopy4", ".python")
 ) {
     // make sure version has necessary keys
     version.python = version.python || "3.10"
@@ -148,8 +147,8 @@ export async function listPackageVersions(name) {
 
 
 export async function installPython(
-    version={python: "3.10", psychopy: appVersion}, 
-    folder=path.join(app.getPath("appData"), "psychopy4", ".python")
+    version = { python: "3.10", psychopy: appVersion },
+    folder = path.join(app.getPath("appData"), "psychopy4", ".python")
 ) {
     // make sure version has necessary keys
     version.python = version.python || "3.10"
@@ -163,31 +162,34 @@ export async function installPython(
     // make a new venv
     proc.execSync(`"${uv.executable}" venv --python ${version.python} --clear "${folder}"`)
     // get executable
-    python.details.executable = findPython()
+    const pythonExecutable = findPython(); // Use local variable instead of python.details.executable
     // install liaison
-    proc.execSync(`"${uv.executable}" pip install git+https://github.com/psychopy/liaison[websocket] --python "${python.details.executable}"`)
+    proc.execSync(`"${uv.executable}" pip install git+https://github.com/psychopy/liaison[websocket] --python "${pythonExecutable}"`)
     // install metapensiero, esprima (Py -> JS translation) and PyQt (expInfo dialog)
-    proc.execSync(`"${uv.executable}" pip install pyqt6 esprima git+https://gitlab.com/peircej/metapensiero.pj --python "${python.details.executable}"`)
+    proc.execSync(`"${uv.executable}" pip install pyqt6 esprima git+https://gitlab.com/peircej/metapensiero.pj --python "${pythonExecutable}"`)
     // install psychopy
     if (version.psychopy.major === "dev") {
-            proc.execSync(
-                `"${uv.executable}" pip install git+https://github.com/psychopy/psychopy-lib@dev --python "${python.details.executable}"`
-            )
+        proc.execSync(
+            `"${uv.executable}" pip install git+https://github.com/psychopy/psychopy-lib@dev --python "${pythonExecutable}"`
+        )
     } else {
         // get known versions of PsychoPy
         let versions = await listPackageVersions("psychopy-lib")
         // if version exists, install from pip
         if (versions.some(item => item.startsWith(version.psychopy.major))) {
             proc.execSync(
-                `"${uv.executable}" pip install psychopy-lib=="${version.psychopy.str}" --python "${python.details.executable}"`
+                `"${uv.executable}" pip install psychopy-lib=="${version.psychopy.str}" --python "${pythonExecutable}"`
             )
         } else {
             // if unreleased, install from the release branch
             proc.execSync(
-                `"${uv.executable}" pip install git+https://github.com/psychopy/psychopy-lib --python "${python.details.executable}"`
+                `"${uv.executable}" pip install git+https://github.com/psychopy/psychopy-lib --python "${pythonExecutable}"`
             )
         }
     }
+
+    // Return the executable path so the caller can update python.details.executable
+    return pythonExecutable;
 }
 
 
@@ -278,7 +280,7 @@ export async function getPackageDetails(name, executable) {
 
 
 export function getEnvironments(
-    folder=path.join(app.getPath("appData"), "psychopy4", ".python")
+    folder = path.join(app.getPath("appData"), "psychopy4", ".python")
 ) {
     let output = {}
     // iterate through subfolders in the python folder
@@ -304,7 +306,7 @@ export function getEnvironments(
             version: ppyVersion
         }
     }
-    
+
     return output
 }
 
@@ -324,7 +326,7 @@ export var uv = {
             win => win.webContents.send("uv", message)
         )
     },
-    exists: () => fs.globSync("uv*", {cwd: uv.dir}).length > 0,
+    exists: () => fs.globSync("uv*", { cwd: uv.dir }).length > 0,
     installUV: installUV,
     installPython: installPython,
     findPython: findPython,
